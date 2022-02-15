@@ -1,5 +1,7 @@
 setwd('/Users/zagidull/Documents/elli_projects/repli_seq/raw_data_repli_seq')
 library('tidyverse')
+library('gridExtra')
+library('splines')
 
 # chrX gene names. To be excluded
 chrX_ins <- c("Dmd", "Nlgn3", "Il13ra2", "Gpc4")
@@ -87,16 +89,50 @@ del <- inner_join(len_del, pol2_del, by = 'genename') %>%
 rm(chrX_del, chrX_ins, len_del, len_ins, msi_del, msi_ins, pol2_del, pol2_ins, s50_del, s50_ins)
 
 # correlations
-## rather weak correlation between s50 and length in insertions (absent in deletions. 
-## There are virtually no correlations between three variables in deletions. 
+## rather weak, but significant correlation between s50 and length in insertions. p=0.0345 with 95%CI (0.02434869, 0.55261412). 
+## There are no stat signif correlations between three variables in deletions. 
 cor(ins[,c('diff','mutatedSamplesFrc','s50')])
+cor.test(ins$diff, ins$s50) 
 cor(del[,c('diff','mutatedSamplesFrc','s50')])
+
+# re: replication timing and mutatedSamplesFrc
+## there is a weak (0.09) positive association between s50 and instability in deletions
+## there is a weak negative (-0.17) negative association between s50 and instability in insertions
+## but neither are significant
+cor.test(del$s50, del$mutatedSamplesFrc)
+cor.test(ins$s50, ins$mutatedSamplesFrc)
 
 # for correlation of binary to continuous 
 # let's fit log reg using Pol2 status as response
 # no need to standardize the data, since non-regularized log reg
 ## neither in insertions, nor in deletions pol2 status can be significantly associated with mutational frequency
-summary(glm(rnapol2~mutatedSamplesFrc, data = ins, family = 'binomial'))
-summary(glm(rnapol2~mutatedSamplesFrc, data = del, family = 'binomial'))
+logreg_ins_mutatedSamplesFrc <- glm(rnapol2~mutatedSamplesFrc, data = ins, family = 'binomial')
+logreg_del_mutatedSamplesFrc <- glm(rnapol2~mutatedSamplesFrc, data = del, family = 'binomial')
+summary(logreg_ins_mutatedSamplesFrc)
+summary(logreg_del_mutatedSamplesFrc)
 
+# rnapol2 vs length
+## significant association in del for pol2 status vs gene length
+## for every extra bp (of gene length) we get 0.00086% higher chance of it having positive Pol II status with p-val of <0.001
+logreg_ins_diff <- glm(rnapol2~diff, data = ins, family = 'binomial')
+logreg_del_diff <- glm(rnapol2~diff, data = del, family = 'binomial')
+summary(logreg_ins_diff)
+summary(logreg_del_diff)
+# odds from log-odds
+exp(cbind(OR = coef(logreg_del_diff), confint(logreg_del_diff)))
+
+
+# rnapol2 vs s50
+## borderline significance of s50 for both ins / del. But let's assume that due to limited samples size it is not. at least for now
+summary(glm(rnapol2~s50, data = ins, family = 'binomial'))
+summary(glm(rnapol2~s50, data = del, family = 'binomial'))
+
+
+# hist of s50. However, spread is better shown using mean/sd or median/iqr
+grid.arrange(ggplot(ins, aes(x=s50)) + geom_histogram(), 
+             ggplot(del, aes(x=s50)) + geom_histogram())
+
+# two-sided t-test with H0 of means being equal
+## rejected with p-val of 0.036
+t.test(ins$s50, del$s50)
 
