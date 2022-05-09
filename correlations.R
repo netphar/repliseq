@@ -3,42 +3,58 @@ library('gridExtra')
 library('splines')
 library('broom')
 
+setwd('/Users/zagidull/Documents/elli_projects/repli_seq/raw_data_repli_seq/')
+
 # chrX gene names. To be excluded
-chrX_ins <- c("Dmd", "Nlgn3", "Il13ra2", "Gpc4")
-chrX_del <- c("Huwe1", "Phka1", "Mcf2", "Zbtb33")
+#chrX_ins <- c("Dmd", "Nlgn3", "Il13ra2", "Gpc4") <- old, for top50 names
+#chrX_del <- c("Huwe1", "Phka1", "Mcf2", "Zbtb33") <- old, for top50 names
+
+chrX_del <- read_tsv('MSIdelGeneCoordinatesNEW_bulat.txt',
+                     col_types = cols(.default = col_character())
+                     ) %>% 
+    filter(chr=='chrX') %>%
+    select(genename) %>%
+    flatten_chr
+
+chrX_ins <- read_tsv('MSIinsGeneCoordinatesNEW_bulat.txt',
+                     col_types = cols(.default = col_character())
+                     ) %>% 
+    filter(chr=='chrX') %>%
+    select(genename) %>%
+    flatten_chr   
 
 # reading in raw data + preparing for joining by gene name
-pol2_ins <- read_tsv('KOinsHitsRNApol2statusNEW_NEW.txt',
+pol2_ins <- read_tsv('MSIinskoGenesRNApol2statusNEW_NEW.txt',
                      col_types = cols(.default = col_character(), 
                                       rnapol2 = col_factor())
                      ) %>%
     filter(!genename %in% chrX_ins) %>%
-    as.data.frame()
+    as.data.frame
 
-pol2_del <- read_tsv('KOdelHitsRNApol2statusNEW_NEW.txt',
+pol2_del <- read_tsv('MSIdelkoGenesRNApol2statusNEW_NEW.txt',
                      col_types = cols(.default = col_character(), 
                                       rnapol2 = col_factor())
                      ) %>%
     filter(!genename %in% chrX_del) %>%
-    as.data.frame()
+    as.data.frame
 
-s50_ins <- read_tsv('insertions_top50_NEW.csv',
+s50_ins <- read_tsv('insertions_all_090522.csv',
                     col_types = cols(.default = col_character(), 
                                      s50 = col_double())
                     ) %>%
     select(genes, s50) %>%
     filter(!genes %in% chrX_del) %>%
-    as.data.frame()
+    as.data.frame
 
-s50_del <- read_tsv('deletions_top50_NEW.csv',
+s50_del <- read_tsv('deletions_all_090522.csv',
                     col_types = cols(.default = col_character(), 
                                      s50 = col_double())
                     ) %>%
     select(genes, s50) %>%
     filter(!genes %in% chrX_ins) %>%
-    as.data.frame()
+    as.data.frame
 
-len_ins <- read_tsv('hotspotInsertionsGeneCoordinatesNEW_bulat.txt',
+len_ins <- read_tsv('MSIinsGeneCoordinatesNEW_bulat.txt',
                     col_types = cols(.default = col_character(), 
                                      start = col_double(), 
                                      end = col_double())
@@ -47,9 +63,9 @@ len_ins <- read_tsv('hotspotInsertionsGeneCoordinatesNEW_bulat.txt',
     filter(!genename %in% chrX_ins) %>%
     mutate(diff = end-start) %>%
     select(-c(start,end)) %>%
-    as.data.frame()
+    as.data.frame
 
-len_del <- read_tsv('hotspotDeletionsGeneCoordinatesNEW_bulat.txt',
+len_del <- read_tsv('MSIdelGeneCoordinatesNEW_bulat.txt',
                     col_types = cols(.default = col_character(), 
                                      start = col_double(), 
                                      end = col_double())
@@ -58,21 +74,23 @@ len_del <- read_tsv('hotspotDeletionsGeneCoordinatesNEW_bulat.txt',
     filter(!genename %in% chrX_del) %>%
     mutate(diff = end-start) %>%
     select(-c(start,end)) %>%
-    as.data.frame()
+    as.data.frame
     
-msi_ins <- read_tsv('MSI_ins_Hotspot_for_bulat.txt',
+msi_ins <- read_tsv('MSIinskoTargetGenesNEW.txt',
                     col_types = cols(.default = col_character(), 
                                      mutatedSamplesFrc = col_double())
                     ) %>%
+    select(c(genename,mutatedSamplesFrc)) %>%
     filter(!genename %in% chrX_ins) %>%
-    as.data.frame()
+    as.data.frame
 
-msi_del <- read_tsv('MSI_del_Hotspot_for_bulat.txt',
+msi_del <- read_tsv('MSIdelkoTargetGenesNEW.txt',
                     col_types = cols(.default = col_character(), 
                                      mutatedSamplesFrc = col_double())
                     ) %>%
+    select(c(genename,mutatedSamplesFrc)) %>%
     filter(!genename %in% chrX_del) %>%
-    as.data.frame()
+    as.data.frame
 
 # join by gene name
 ins <- inner_join(len_ins, pol2_ins, by = 'genename') %>%
@@ -89,18 +107,29 @@ del <- inner_join(len_del, pol2_del, by = 'genename') %>%
 rm(chrX_del, chrX_ins, len_del, len_ins, msi_del, msi_ins, pol2_del, pol2_ins, s50_del, s50_ins)
 
 # correlations
-## rather weak, but significant correlation between s50 and length in insertions. p=0.0312 with 95%CI (0.02434869, 0.55261412). 
-## There are no stat signif correlations between three variables in deletions. 
 cor(ins[,c('diff','mutatedSamplesFrc','s50')])
 cor.test(ins$diff, ins$s50) 
 cor(del[,c('diff','mutatedSamplesFrc','s50')])
+cor.test(del$diff, del$s50) 
+## OLD result for top50 genes
+## rather weak, but significant correlation between s50 and length in insertions. p=0.0312 with 95%CI (0.02434869, 0.55261412). 
+## There are no stat signif correlations between three variables in deletions. 
+### NEW result when all genes are considered
+### a correlation of 0.5131294 between s50 and length in insertions with p=6.011e-07 and 95%CI (0.3356611, 0.6554202)
+### a correlation of 0.2870757 between s50 and length in deletions with p=2.647e-13 and 95%CI (.2133951, 0.3575091)
+
 
 # re: replication timing and mutatedSamplesFrc
+cor.test(del$s50, del$mutatedSamplesFrc)
+cor.test(ins$s50, ins$mutatedSamplesFrc)
+## for top50
 ## there is a weak (0.1) positive association between s50 and instability in deletions
 ## there is a weak negative (-0.17) negative association between s50 and instability in insertions
 ## but neither are significant
-cor.test(del$s50, del$mutatedSamplesFrc)
-cor.test(ins$s50, ins$mutatedSamplesFrc)
+### FOR all genes 
+### there is a weak (0.044) positive association between s50 and instability in deletions
+### there is a weak negative (-0.11) negative association between s50 and instability in insertions
+### but neither are significant, p=0.2626 and p=0.2937 respectively
 
 # USING t.test to find association between rnapol2 vs length
 ## suggested by Esa
@@ -108,8 +137,8 @@ cor.test(ins$s50, ins$mutatedSamplesFrc)
 ttestPolII <- function(genomic_feature){
     # genomic feature is the colname, so one of c('diff','s50','mutatedSamplesFrc')
     print('pvals')
-    p_del <- round(t.test(del[del$rnapol2=='yes', genomic_feature], del[del$rnapol2=='no', genomic_feature])$p.value, 3)
-    p_ins <- round(t.test(ins[ins$rnapol2=='yes', genomic_feature], ins[ins$rnapol2=='no', genomic_feature])$p.value, 3)
+    p_del <- t.test(del[del$rnapol2=='yes', genomic_feature], del[del$rnapol2=='no', genomic_feature])$p.value
+    p_ins <- t.test(ins[ins$rnapol2=='yes', genomic_feature], ins[ins$rnapol2=='no', genomic_feature])$p.value
     return(c(p_del, p_ins))
 }
 
@@ -139,6 +168,7 @@ meanPolII <- function(){
     return(rbind(df_del, df_ins))
 }
 
+## OLD for top50 genes
 ## there is a difference between gene lengths between Pol II positive and negative genes with p-val=0.002 for MSI-del. PolII positive are shorter (mean length=62549), PolII negative are longer (mean length=188772) 
 ## p-val (0.65) is not significant for gene length differences in the MSI-ins group 
 
@@ -146,7 +176,20 @@ f_names <- c('diff','s50','mutatedSamplesFrc')
 meanPolII()
 
 # t-test p-vals
-## multiple hypothesis testing is not needed since we have different data. To check again
+## multiple hypothesis testing is not needed since we have different data
 sapply(f_names, ttestPolII) %>%
     as.data.frame() %>% 
     mutate(label=c('del','ins'), .before='diff') 
+
+### NEW for all genes
+### FOR MSI-del. 
+### there is a difference between gene lengths in Pol II positive and negative genes, 
+### PolII positive are shorter (length=51689), PolII negative are longer (length=78777), with p-val=8.966018e-06 
+### there is a difference between s50 in Pol II positive and negative genes, 
+### PolII positive have lower s50 (s50=0.321), PolII negative are higher s50 (s50=0.411), with p-val=6.700679e-10 
+### FOR MSI-ins. 
+### there is a difference between gene lengths in Pol II positive and negative genes, 
+### PolII positive are shorter (length=56565), PolII negative are longer (length=72367), with p-val=0.02271116
+### there is a difference between s50 in Pol II positive and negative genes, 
+### PolII positive have lower s50 (s50=0.287), PolII negative have higher s50 (s50=0.363),  with p-val=0.04740439
+### No significant differences in mutated Samples Frc for either
