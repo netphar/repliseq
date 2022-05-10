@@ -1,6 +1,4 @@
 library('tidyverse')
-library('gridExtra')
-library('splines')
 library('broom')
 
 # make sure to set wd
