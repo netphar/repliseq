@@ -1,8 +1,6 @@
 # repliseq
 replication timing analysis for Aska et al 2022, using repliseq data from Zhao et al 2020. If you try to replicate, pay attention to folder structure in script files.
 
-Shield: [![CC BY 4.0][cc-by-shield]][cc-by]
-
 This work is licensed under a
 [Creative Commons Attribution 4.0 International License][cc-by].
 
