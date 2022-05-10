@@ -3,7 +3,8 @@ library('gridExtra')
 library('splines')
 library('broom')
 
-setwd('/Users/zagidull/Documents/elli_projects/repli_seq/raw_data_repli_seq/')
+# make sure to set wd
+#setwd('raw_data/')
 
 # chrX gene names. To be excluded
 #chrX_ins <- c("Dmd", "Nlgn3", "Il13ra2", "Gpc4") <- old, for top50 names
