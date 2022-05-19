@@ -6,22 +6,10 @@ This notebook contains correlations analysis.
 ``` r
 rm(list=ls(all=TRUE))
 library('tidyverse')
-```
-
-    ## ── Attaching packages ─────────────────────────────────────── tidyverse 1.3.1 ──
-
-    ## ✔ ggplot2 3.3.6     ✔ purrr   0.3.4
-    ## ✔ tibble  3.1.7     ✔ dplyr   1.0.9
-    ## ✔ tidyr   1.2.0     ✔ stringr 1.4.0
-    ## ✔ readr   2.1.2     ✔ forcats 0.5.1
-
-    ## ── Conflicts ────────────────────────────────────────── tidyverse_conflicts() ──
-    ## ✖ dplyr::filter() masks stats::filter()
-    ## ✖ dplyr::lag()    masks stats::lag()
-
-``` r
 library('broom')
 ```
+
+Let’s find ChrX genes. They are excluded from analysis
 
 ``` r
 # chrX gene names. To be excluded
@@ -43,21 +31,9 @@ chrX_ins <- read_tsv('MSIinsGeneCoordinatesNEW_bulat.txt',
     flatten_chr   
 ```
 
+load data
+
 ``` r
-chrX_del <- read_tsv('MSIdelGeneCoordinatesNEW_bulat.txt',
-                     col_types = cols(.default = col_character())
-                     ) %>% 
-    filter(chr=='chrX') %>%
-    select(genename) %>%
-    flatten_chr
-
-chrX_ins <- read_tsv('MSIinsGeneCoordinatesNEW_bulat.txt',
-                     col_types = cols(.default = col_character())
-                     ) %>% 
-    filter(chr=='chrX') %>%
-    select(genename) %>%
-    flatten_chr   
-
 # reading in raw data + preparing for joining by gene name
 pol2_ins <- read_tsv('MSIinskoGenesRNApol2statusNEW_NEW.txt',
                      col_types = cols(.default = col_character(), 
@@ -128,6 +104,8 @@ msi_del <- read_tsv('MSIdelkoTargetGenesNEW.txt',
     as.data.frame
 ```
 
+join all by gene names. results in two files - ins and del
+
 ``` r
 ins <- inner_join(len_ins, pol2_ins, by = 'genename') %>%
     inner_join(., msi_ins, by = 'genename') %>%
@@ -138,122 +116,49 @@ del <- inner_join(len_del, pol2_del, by = 'genename') %>%
     inner_join(., msi_del, by = 'genename') %>%
     inner_join(., s50_del, by = c('genename' = 'genes')) %>%
     as.data.frame
-```
 
-``` r
 rm(chrX_del, chrX_ins, len_del, len_ins, msi_del, msi_ins, pol2_del, pol2_ins, s50_del, s50_ins)
 ```
 
-``` r
-# correlations
-cor(ins[,c('diff','mutatedSamplesFrc','s50')])
-```
-
-    ##                          diff mutatedSamplesFrc        s50
-    ## diff               1.00000000       -0.09250722  0.5131294
-    ## mutatedSamplesFrc -0.09250722        1.00000000 -0.1159092
-    ## s50                0.51312939       -0.11590918  1.0000000
+### Let’s see correlations in ins and dels without any stratification
 
 ``` r
-cor.test(ins$diff, ins$s50) 
+tidy_cor <- function(object){
+    l <- vector('list', length = 3)
+    l[[1]] <- tidy(cor.test(object$diff, object$mutatedSamplesFrc))
+    l[[2]] <- tidy(cor.test(object$diff, object$s50))
+    l[[3]] <- tidy(cor.test(object$s50, object$mutatedSamplesFrc))
+    return(do.call(rbind, l))
+}
+tb <- tidy_cor(ins)
+tb <- add_column(tb, .before = 1, var1=c('diff','diff','s50'))
+tb <- add_column(tb, .before = 2, var2=c('mutatedSamplesFrc','s50','mutatedSamplesFrc'))
+tb <- add_column(tb, .before = 1, type='ins')
+
+tb1 <- tidy_cor(del)
+tb1 <- add_column(tb1, .before = 1, var1=c('diff','diff','s50'))
+tb1 <- add_column(tb1, .before = 2, var2=c('mutatedSamplesFrc','s50','mutatedSamplesFrc'))
+tb1 <- add_column(tb1, .before = 1, type='del')
+bind_rows(tb, tb1)
 ```
 
-    ## 
-    ##  Pearson's product-moment correlation
-    ## 
-    ## data:  ins$diff and ins$s50
-    ## t = 5.4136, df = 82, p-value = 6.011e-07
-    ## alternative hypothesis: true correlation is not equal to 0
-    ## 95 percent confidence interval:
-    ##  0.3356611 0.6554202
-    ## sample estimates:
-    ##       cor 
-    ## 0.5131294
+    ## # A tibble: 6 × 11
+    ##   type  var1  var2      estimate statistic  p.value parameter conf.low conf.high
+    ##   <chr> <chr> <chr>        <dbl>     <dbl>    <dbl>     <int>    <dbl>     <dbl>
+    ## 1 ins   diff  mutatedS…  -0.0925    -0.841 4.03e- 1        82  -0.301      0.124
+    ## 2 ins   diff  s50         0.513      5.41  6.01e- 7        82   0.336      0.655
+    ## 3 ins   s50   mutatedS…  -0.116     -1.06  2.94e- 1        82  -0.322      0.101
+    ## 4 del   diff  mutatedS…   0.0357     0.890 3.74e- 1       622  -0.0429     0.114
+    ## 5 del   diff  s50         0.287      7.47  2.65e-13       622   0.213      0.358
+    ## 6 del   s50   mutatedS…   0.0449     1.12  2.63e- 1       622  -0.0337     0.123
+    ## # … with 2 more variables: method <chr>, alternative <chr>
 
-``` r
-cor(del[,c('diff','mutatedSamplesFrc','s50')])
-```
+-   the only positively & significantly correlated pair in insertions is
+    diff vs s50 (0.513)
+-   the only positively & significantly correlated pair in deletions is
+    diff vs s50 (0.287)
 
-    ##                         diff mutatedSamplesFrc        s50
-    ## diff              1.00000000        0.03568217 0.28707573
-    ## mutatedSamplesFrc 0.03568217        1.00000000 0.04491564
-    ## s50               0.28707573        0.04491564 1.00000000
-
-``` r
-cor.test(del$diff, del$s50) 
-```
-
-    ## 
-    ##  Pearson's product-moment correlation
-    ## 
-    ## data:  del$diff and del$s50
-    ## t = 7.4743, df = 622, p-value = 2.647e-13
-    ## alternative hypothesis: true correlation is not equal to 0
-    ## 95 percent confidence interval:
-    ##  0.2133951 0.3575091
-    ## sample estimates:
-    ##       cor 
-    ## 0.2870757
-
-``` r
-## OLD result for top50 genes
-## rather weak, but significant correlation between s50 and length in insertions. p=0.0312 with 95%CI (0.02434869, 0.55261412). 
-## There are no stat signif correlations between three variables in deletions. 
-```
-
-### Correlation result, all together. For all unstable MSI genes:
-
--   a correlation of 0.5131294 between s50 and length in insertions with
-    p=6.011e-07 and 95%CI (0.3356611, 0.6554202)
--   a correlation of 0.2870757 between s50 and length in deletions with
-    p=2.647e-13 and 95%CI (0.2133951, 0.3575091)
-
-``` r
-cor.test(del$s50, del$mutatedSamplesFrc)
-```
-
-    ## 
-    ##  Pearson's product-moment correlation
-    ## 
-    ## data:  del$s50 and del$mutatedSamplesFrc
-    ## t = 1.1213, df = 622, p-value = 0.2626
-    ## alternative hypothesis: true correlation is not equal to 0
-    ## 95 percent confidence interval:
-    ##  -0.033692  0.122971
-    ## sample estimates:
-    ##        cor 
-    ## 0.04491564
-
-``` r
-cor.test(ins$s50, ins$mutatedSamplesFrc)
-```
-
-    ## 
-    ##  Pearson's product-moment correlation
-    ## 
-    ## data:  ins$s50 and ins$mutatedSamplesFrc
-    ## t = -1.0567, df = 82, p-value = 0.2937
-    ## alternative hypothesis: true correlation is not equal to 0
-    ## 95 percent confidence interval:
-    ##  -0.3222952  0.1009958
-    ## sample estimates:
-    ##        cor 
-    ## -0.1159092
-
-``` r
-## for top50
-## there is a weak (0.1) positive association between s50 and instability in deletions
-## there is a weak negative (-0.17) negative association between s50 and instability in insertions
-## but neither are significant
-```
-
-### S50 vs num mutated samples for all genes
-
--   there is a weak (0.044) positive association between s50 and
-    mutatedSamplesFrc in deletions
--   there is a weak negative (-0.11) negative association between s50
-    and mutatedSamplesFrc in insertions but neither are significant,
-    p=0.2626 and p=0.2937 respectively
+### Let’s see what happens when we stratify by PolII status
 
 ``` r
 ttestPolII <- function(genomic_feature){
